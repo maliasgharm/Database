@@ -142,15 +142,17 @@ class Database(context: Context, val table: Table) : SQLiteOpenHelper(context, D
     fun delete(hashMaps: ArrayList<HashMap<String, Any>>, response: DeleteArrayResponse) {
         Thread {
 
-            val ids = arrayOfNulls<String>(hashMaps.size)
-            for (item in 0 until hashMaps.size) {
-                ids[item] = hashMaps[item].toString()
+            var result = -3
+            if (isTableExists(table.table_name)) {
+                val ids = arrayOfNulls<String>(hashMaps.size)
+                for (item in 0 until hashMaps.size) {
+                    ids[item] = hashMaps[item].toString()
+                }
+                val selection = "$KEY_ID LIKE ?"
+                // Specify arguments in placeholder order.
+                val db = writableDatabase
+                result = db.delete(table.table_name, selection, ids)
             }
-            val selection = "$KEY_ID LIKE ?"
-            // Specify arguments in placeholder order.
-            val db = writableDatabase
-
-            val result = db.delete(table.table_name, selection, ids)
             handler.post {
                 response.deleted(result)
             }
@@ -161,8 +163,11 @@ class Database(context: Context, val table: Table) : SQLiteOpenHelper(context, D
     fun deleteAll(response: DeleteResponse) {
         Thread {
             // Specify arguments in placeholder order.
-            val db = writableDatabase
-            val result = db.delete(table.table_name, null, null)
+            var result = -3
+            if (isTableExists(table.table_name)) {
+                val db = writableDatabase
+                result = db.delete(table.table_name, null, null)
+            }
             handler.post {
                 response.deleted(result)
             }
@@ -194,6 +199,25 @@ class Database(context: Context, val table: Table) : SQLiteOpenHelper(context, D
         }.start()
     }
 
+    fun isTableExists(tableName: String): Boolean {
+        var mDatabase = readableDatabase
+        if (!mDatabase.isReadOnly) {
+            mDatabase.close()
+            mDatabase = readableDatabase
+        }
+
+        val cursor =
+            mDatabase.rawQuery("select DISTINCT tbl_name from sqlite_master where tbl_name = '$tableName'", null)
+        if (cursor != null) {
+            if (cursor!!.getCount() > 0) {
+                cursor!!.close()
+                return true
+            }
+            cursor!!.close()
+        }
+        return false
+    }
+
     fun readAll(response: ReadResponseAll) {
         val items = ArrayList<HashMap<String, Any>>()
         val db = writableDatabase
@@ -211,7 +235,7 @@ class Database(context: Context, val table: Table) : SQLiteOpenHelper(context, D
             }
         } catch (e: SQLiteException) {
             db.execSQL(getQuerySalCreateEntries(table))
-            response.read(ArrayList())
+//            response.read(ArrayList())
         }
         handler.post {
             response.read(items)
