@@ -248,7 +248,11 @@ class Database(context: Context, val table: Table) : SQLiteOpenHelper(context, D
                     item.value is JSONArray -> newValue.put(item.key, (item.value as JSONArray).toString())
                 }
             }
-            updateResponse.update(db.update(table.table_name, newValue, KEY_ID + "=" + tableItem[KEY_ID], null) > 0)
+
+            val success = db.update(table.table_name, newValue, KEY_ID + "=" + tableItem[KEY_ID], null) > 0
+            handler.post {
+                updateResponse.update(success)
+            }
         }.start()
     }
 
