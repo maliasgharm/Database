@@ -13,6 +13,7 @@ import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 
+
 /**
  * Created by AliasgahrMirzazade on 10/10/2018 AD.
  */
@@ -94,7 +95,7 @@ class Database(context: Context, val table: Table) : SQLiteOpenHelper(context, D
                 }
                 // Insert the new row, returning the primary key value of the new row
                 Log.w("inser2t", values.toString())
-                val newRowId = InsertResponseItem(db.insert(table.table_name, null, values),true)
+                val newRowId = InsertResponseItem(db.insert(table.table_name, null, values), true)
                 resulte_success_insert.add(newRowId)
             }
 
@@ -156,6 +157,7 @@ class Database(context: Context, val table: Table) : SQLiteOpenHelper(context, D
         }.start()
 
     }
+
     fun deleteAll(response: DeleteResponse) {
         Thread {
             // Specify arguments in placeholder order.
@@ -223,6 +225,34 @@ class Database(context: Context, val table: Table) : SQLiteOpenHelper(context, D
     }
 
     /**
+     *  [tableItem] should with id  for update
+     */
+    fun update(tableItem: HashMap<String, Any>, updateResponse: UpdateResponse) {
+        Thread {
+            val db = writableDatabase
+            if (!tableItem.containsKey(KEY_ID))
+                throw Exception("tableItem can't found id")
+            val newValue = ContentValues()
+            for (item in tableItem) {
+                when {
+                    item.value is String -> newValue.put(item.key, item.value as String)
+                    item.value is Int -> newValue.put(item.key, item.value as Int)
+                    item.value is Short -> newValue.put(item.key, item.value as Short)
+                    item.value is Long -> newValue.put(item.key, item.value as Long)
+                    item.value is Float -> newValue.put(item.key, item.value as Float)
+                    item.value is Double -> newValue.put(item.key, item.value as Double)
+                    item.value is Byte -> newValue.put(item.key, item.value as Byte)
+                    item.value is Boolean -> newValue.put(item.key, item.value as Boolean)
+                    item.value is ByteArray -> newValue.put(item.key, item.value as ByteArray)
+                    item.value is JSONObject -> newValue.put(item.key, "${(item.value as JSONObject)}")
+                    item.value is JSONArray -> newValue.put(item.key, (item.value as JSONArray).toString())
+                }
+            }
+            updateResponse.update(db.update(table.table_name, newValue, KEY_ID + "=" + tableItem[KEY_ID], null) > 0)
+        }.start()
+    }
+
+    /**
      * [rows] is  HashMap< nameRow , TypeRow >
      */
     fun getQuerySalCreateEntries(table: Table): String {
@@ -238,7 +268,11 @@ class Database(context: Context, val table: Table) : SQLiteOpenHelper(context, D
                 }
             }
         }
-        if (table.rows.size > 0 && sql_create_entries.substring(sql_create_entries.length - 1, sql_create_entries.length).equals(","))
+        if (table.rows.size > 0 && sql_create_entries.substring(
+                sql_create_entries.length - 1,
+                sql_create_entries.length
+            ).equals(",")
+        )
             sql_create_entries = sql_create_entries.substring(0, sql_create_entries.length - 1)
         return "$sql_create_entries )"
     }
