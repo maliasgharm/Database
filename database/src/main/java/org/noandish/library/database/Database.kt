@@ -174,54 +174,48 @@ class Database(context: Context, val table: Table) : SQLiteOpenHelper(context, D
         Thread {
             val item = HashMap<String, Any>()
             val db = writableDatabase
-            var cursor: Cursor? = null
             try {
-                cursor = db.rawQuery("select * from ${table.table_name} WHERE $KEY_ID='$id'", null)
+                val cursor = db.rawQuery("select * from ${table.table_name} WHERE $KEY_ID='$id'", null)
+                if (cursor!!.moveToFirst()) {
+                    while (!cursor.isAfterLast) {
+                        for (columnNames in cursor.columnNames) {
+                            item[columnNames] = cursor.getColumnIndex(columnNames)
+                        }
+                        cursor.moveToNext()
+                    }
+                }
             } catch (e: SQLiteException) {
                 // if table not yet present, create it
                 db.execSQL(getQuerySalCreateEntries(table))
             }
-
-            if (cursor!!.moveToFirst()) {
-                while (cursor.isAfterLast == false) {
-                    for (columnNames in cursor.columnNames) {
-                        item[columnNames] = cursor.getColumnIndex(columnNames)
-                    }
-                    cursor.moveToNext()
-                }
-
-            }
-
-            handler.post({
+            handler.post {
                 response.read(item)
-            })
+            }
         }.start()
     }
 
     fun readAll(response: ReadResponseAll) {
         val items = ArrayList<HashMap<String, Any>>()
         val db = writableDatabase
-        var cursor: Cursor? = null
         try {
-            cursor = db.rawQuery("select * from ${table.table_name}", null)
+            val cursor = db.rawQuery("select * from ${table.table_name}", null)
+            if (cursor!!.moveToFirst()) {
+                while (!cursor.isAfterLast) {
+                    val item = HashMap<String, Any>()
+                    for (columnName in cursor.columnNames) {
+                        item[columnName] = cursor.getString(cursor.getColumnIndex(columnName))
+                    }
+                    items.add(item)
+                    cursor.moveToNext()
+                }
+            }
         } catch (e: SQLiteException) {
             db.execSQL(getQuerySalCreateEntries(table))
             response.read(ArrayList())
         }
-
-        if (cursor!!.moveToFirst()) {
-            while (cursor.isAfterLast == false) {
-                val item = HashMap<String, Any>()
-                for (columnName in cursor.columnNames) {
-                    item[columnName] = cursor.getString(cursor.getColumnIndex(columnName))
-                }
-                items.add(item)
-                cursor.moveToNext()
-            }
-        }
-        handler.post({
+        handler.post {
             response.read(items)
-        })
+        }
     }
 
     /**
