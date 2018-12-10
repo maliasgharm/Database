@@ -1,5 +1,6 @@
 package org.noandish.library.database
 
+import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Context
 import android.database.Cursor
@@ -19,6 +20,15 @@ import org.json.JSONObject
  */
 class Database(context: Context, val table: Table) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
     private var handler = Handler(Looper.getMainLooper())
+    var filterItem: HashMap<String, Any>? = null
+
+    fun addFilterItem(key: String, value: Any) {
+        if (filterItem == null)
+            filterItem = HashMap()
+
+        filterItem!![key] = value
+    }
+
     private val SQL_DELETE_ENTRIES = "DROP TABLE IF EXISTS " + table.table_name
 
     override fun onCreate(db: SQLiteDatabase) {
@@ -68,6 +78,32 @@ class Database(context: Context, val table: Table) : SQLiteOpenHelper(context, D
         }.start()
     }
 
+    fun insert(tableItem: HashMap<String, Any>): Long {
+        // Gets the data repository in write mode
+        val db = writableDatabase
+        if (tableItem.containsKey(KEY_ID)) {
+            throw Exception("Can't use Database.KEY_ID or id string for key")
+        }
+        val values = ContentValues()
+        for (item in tableItem) {
+            when {
+                item.value is String -> values.put(item.key, item.value as String)
+                item.value is Int -> values.put(item.key, item.value as Int)
+                item.value is Short -> values.put(item.key, item.value as Short)
+                item.value is Long -> values.put(item.key, item.value as Long)
+                item.value is Float -> values.put(item.key, item.value as Float)
+                item.value is Double -> values.put(item.key, item.value as Double)
+                item.value is Byte -> values.put(item.key, item.value as Byte)
+                item.value is Boolean -> values.put(item.key, item.value as Boolean)
+                item.value is ByteArray -> values.put(item.key, item.value as ByteArray)
+                item.value is JSONObject -> values.put(item.key, "${(item.value as JSONObject)}")
+                item.value is JSONArray -> values.put(item.key, (item.value as JSONArray).toString())
+            }
+        }
+        // Insert the new row, returning the primary key value of the new row
+        return db.insert(table.table_name, null, values)
+    }
+
     fun insertAll(tableItems: ArrayList<HashMap<String, Any>>, response: InsertAllResponse) {
         Thread {
             // Gets the data repository in write mode
@@ -105,6 +141,40 @@ class Database(context: Context, val table: Table) : SQLiteOpenHelper(context, D
         }.start()
     }
 
+    fun insertAll(tableItems: ArrayList<HashMap<String, Any>>): ArrayList<InsertResponseItem> {
+        // Gets the data repository in write mode
+        val db = writableDatabase
+        var resulte_success_insert = ArrayList<InsertResponseItem>()
+        for (tableItem in tableItems) {
+            if (tableItem.containsKey(KEY_ID)) {
+                throw Exception("Can't use Database.KEY_ID or id string for key")
+            }
+            val values = ContentValues()
+            for (item in tableItem) {
+                when {
+                    item.value is String -> values.put(item.key, item.value as String)
+                    item.value is Int -> values.put(item.key, item.value as Int)
+                    item.value is Short -> values.put(item.key, item.value as Short)
+                    item.value is Long -> values.put(item.key, item.value as Long)
+                    item.value is Float -> values.put(item.key, item.value as Float)
+                    item.value is Double -> values.put(item.key, item.value as Double)
+                    item.value is Byte -> values.put(item.key, item.value as Byte)
+                    item.value is Boolean -> values.put(item.key, item.value as Boolean)
+                    item.value is ByteArray -> values.put(item.key, item.value as ByteArray)
+                    item.value is JSONObject -> values.put(item.key, "${(item.value as JSONObject)}")
+                    item.value is JSONArray -> values.put(item.key, (item.value as JSONArray).toString())
+                }
+            }
+            // Insert the new row, returning the primary key value of the new row
+            Log.w("inser2t", values.toString())
+            val newRowId = InsertResponseItem(db.insert(table.table_name, null, values), true)
+            resulte_success_insert.add(newRowId)
+        }
+
+        return resulte_success_insert
+
+    }
+
     /**
      * hashmap.put(KEY_TABLE_NAME,string) and hashmap.put(KEY_ID,int)
      *@sample delete(hashmap,response)
@@ -135,6 +205,27 @@ class Database(context: Context, val table: Table) : SQLiteOpenHelper(context, D
         }.start()
     }
 
+    @Throws(SQLiteConstraintException::class)
+    fun delete(hashMap: HashMap<String, Any>): Int {
+        if (!hashMap.containsKey(KEY_ID)) {
+            throw Exception("KEY_ID can't find ; should put KEY_ID in HashMap")
+        }
+        val hashMaps = ArrayList<HashMap<String, Any>>()
+        hashMaps.add(hashMap)
+
+        val ids = arrayOfNulls<String>(hashMaps.size)
+        for (item in 0 until hashMaps.size) {
+            ids[item] = hashMaps[item].toString()
+        }
+        val selection = "$KEY_ID LIKE ?"
+        // Specify arguments in placeholder order.
+        val db = writableDatabase
+
+        val result = db.delete(table.table_name, selection, ids)
+
+        return result
+    }
+
     /**
      * [deleteUser] return All id Success deleted
      */
@@ -160,6 +251,21 @@ class Database(context: Context, val table: Table) : SQLiteOpenHelper(context, D
 
     }
 
+    fun delete(hashMaps: ArrayList<HashMap<String, Any>>): Int {
+        var result = -3
+        if (isTableExists(table.table_name)) {
+            val ids = arrayOfNulls<String>(hashMaps.size)
+            for (item in 0 until hashMaps.size) {
+                ids[item] = hashMaps[item].toString()
+            }
+            val selection = "$KEY_ID LIKE ?"
+            // Specify arguments in placeholder order.
+            val db = writableDatabase
+            result = db.delete(table.table_name, selection, ids)
+        }
+        return result
+    }
+
     fun deleteAll(response: DeleteResponse) {
         Thread {
             // Specify arguments in placeholder order.
@@ -172,15 +278,25 @@ class Database(context: Context, val table: Table) : SQLiteOpenHelper(context, D
                 response.deleted(result)
             }
         }.start()
-
     }
 
+    fun deleteAll(): Int {
+        // Specify arguments in placeholder order.
+        var result = -3
+        if (isTableExists(table.table_name)) {
+            val db = writableDatabase
+            result = db.delete(table.table_name, null, null)
+        }
+        return result
+    }
+
+    @SuppressLint("Recycle")
     fun read(id: Int, response: ReadResponse) {
         Thread {
             val item = HashMap<String, Any>()
             val db = writableDatabase
             try {
-                val cursor = db.rawQuery("select * from ${table.table_name} WHERE $KEY_ID='$id'", null)
+                val cursor = db.rawQuery("select * from ${table.table_name} WHERE $KEY_ID='$id' ${filter()}", null)
                 if (cursor!!.moveToFirst()) {
                     while (!cursor.isAfterLast) {
                         for (columnNames in cursor.columnNames) {
@@ -197,6 +313,59 @@ class Database(context: Context, val table: Table) : SQLiteOpenHelper(context, D
                 response.read(item)
             }
         }.start()
+    }
+
+    private fun filter(withAndFirst: Boolean = true): String {
+        var withAndFirst = withAndFirst
+        var filter = ""
+        val keys = filterItem?.keys ?: return ""
+
+        for (key in keys) {
+
+
+//            when {
+//                filterItem!![key] is String -> newValue.put(item.key, item.value as String)
+//                filterItem!![key] is Int -> newValue.put(item.key, item.value as Int)
+//                filterItem!![key] is Short -> newValue.put(item.key, item.value as Short)
+//                filterItem!![key] is Long -> newValue.put(item.key, item.value as Long)
+//                filterItem!![key] is Float -> newValue.put(item.key, item.value as Float)
+//                filterItem!![key] is Double -> newValue.put(item.key, item.value as Double)
+//                filterItem!![key] is Byte -> newValue.put(item.key, item.value as Byte)
+//                filterItem!![key] is Boolean -> newValue.put(item.key, item.value as Boolean)
+//                filterItem!![key] is ByteArray -> newValue.put(item.key, item.value as ByteArray)
+//                filterItem!![key] is JSONObject -> newValue.put(item.key, "${(item.value as JSONObject)}")
+//                filterItem!![key] is JSONArray -> newValue.put(item.key, (item.value as JSONArray).toString())
+//            }
+
+
+            filter += (if (withAndFirst) {
+                withAndFirst = true; " or "
+            } else "") + "  $key='${filterItem!![key]}' "
+
+
+        }
+        return filter
+    }
+
+    @SuppressLint("Recycle")
+    fun read(id: Int): HashMap<String, Any> {
+        val item = HashMap<String, Any>()
+        val db = writableDatabase
+        try {
+            val cursor = db.rawQuery("select * from ${table.table_name} WHERE $KEY_ID='$id' ${filter()}  ", null)
+            if (cursor!!.moveToFirst()) {
+                while (!cursor.isAfterLast) {
+                    for (columnNames in cursor.columnNames) {
+                        item[columnNames] = cursor.getColumnIndex(columnNames)
+                    }
+                    cursor.moveToNext()
+                }
+            }
+        } catch (e: SQLiteException) {
+            // if table not yet present, create it
+            db.execSQL(getQuerySalCreateEntries(table))
+        }
+        return item
     }
 
     fun isTableExists(tableName: String): Boolean {
@@ -222,7 +391,10 @@ class Database(context: Context, val table: Table) : SQLiteOpenHelper(context, D
         val items = ArrayList<HashMap<String, Any>>()
         val db = writableDatabase
         try {
-            val cursor = db.rawQuery("select * from ${table.table_name}", null)
+            val mFilter = filter(false)
+            val filter = if (mFilter == "") "" else " where $mFilter"
+            val cursor =
+                db.rawQuery("select * from ${table.table_name} $filter", null)
             if (cursor!!.moveToFirst()) {
                 while (!cursor.isAfterLast) {
                     val item = HashMap<String, Any>()
@@ -240,6 +412,31 @@ class Database(context: Context, val table: Table) : SQLiteOpenHelper(context, D
         handler.post {
             response.read(items)
         }
+    }
+
+    fun readAll(): ArrayList<HashMap<String, Any>> {
+        val items = ArrayList<HashMap<String, Any>>()
+        val db = writableDatabase
+        try {
+
+            val mFilter = filter(false)
+            val filter = if (mFilter == "") "" else " where $mFilter"
+            val cursor = db.rawQuery("select * from ${table.table_name} $filter", null)
+            if (cursor!!.moveToFirst()) {
+                while (!cursor.isAfterLast) {
+                    val item = HashMap<String, Any>()
+                    for (columnName in cursor.columnNames) {
+                        item[columnName] = cursor.getString(cursor.getColumnIndex(columnName))
+                    }
+                    items.add(item)
+                    cursor.moveToNext()
+                }
+            }
+        } catch (e: SQLiteException) {
+            db.execSQL(getQuerySalCreateEntries(table))
+//            response.read(ArrayList())
+        }
+        return items
     }
 
     /**
@@ -267,11 +464,36 @@ class Database(context: Context, val table: Table) : SQLiteOpenHelper(context, D
                 }
             }
 
-            val success = db.update(table.table_name, newValue, KEY_ID + "=" + tableItem[KEY_ID], null) > 0
+            val success =
+                db.update(table.table_name, newValue, KEY_ID + "=" + tableItem[KEY_ID] + " ${filter()}", null) > 0
             handler.post {
                 updateResponse.update(success)
             }
         }.start()
+    }
+
+    fun update(tableItem: HashMap<String, Any>): Boolean {
+        val db = writableDatabase
+        if (!tableItem.containsKey(KEY_ID))
+            throw Exception("tableItem can't found id")
+        val newValue = ContentValues()
+        for (item in tableItem) {
+            when {
+                item.value is String -> newValue.put(item.key, item.value as String)
+                item.value is Int -> newValue.put(item.key, item.value as Int)
+                item.value is Short -> newValue.put(item.key, item.value as Short)
+                item.value is Long -> newValue.put(item.key, item.value as Long)
+                item.value is Float -> newValue.put(item.key, item.value as Float)
+                item.value is Double -> newValue.put(item.key, item.value as Double)
+                item.value is Byte -> newValue.put(item.key, item.value as Byte)
+                item.value is Boolean -> newValue.put(item.key, item.value as Boolean)
+                item.value is ByteArray -> newValue.put(item.key, item.value as ByteArray)
+                item.value is JSONObject -> newValue.put(item.key, "${(item.value as JSONObject)}")
+                item.value is JSONArray -> newValue.put(item.key, (item.value as JSONArray).toString())
+            }
+        }
+
+        return db.update(table.table_name, newValue, KEY_ID + "=" + tableItem[KEY_ID] + " ${filter()} ", null) > 0
     }
 
     /**
@@ -300,8 +522,8 @@ class Database(context: Context, val table: Table) : SQLiteOpenHelper(context, D
     }
 
     companion object {
-        val DATABASE_VERSION = 1
-        val DATABASE_NAME = "FeedReader.db"
+        var DATABASE_VERSION = 1
+        var DATABASE_NAME = "FeedReader.db"
         val KEY_ID = "id"
     }
 
