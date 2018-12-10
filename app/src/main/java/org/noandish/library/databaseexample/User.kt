@@ -40,12 +40,10 @@ class User(val fname: String, val lname: String) {
             return jsonObject
         }
 
-
         fun getTable(): Table {
             val rows = ArrayList<Row>()
             rows.add(Row(KEY_LNAME, Row.TYPE_STRING))
             rows.add(Row(KEY_FNAME, Row.TYPE_STRING))
-
             return Table(NAME_TABLE, rows)
         }
 
@@ -77,5 +75,4 @@ class User(val fname: String, val lname: String) {
             return if (read.size > 0) read[0] else null
         }
     }
-
 }

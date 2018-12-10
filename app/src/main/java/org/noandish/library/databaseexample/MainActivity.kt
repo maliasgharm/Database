@@ -16,9 +16,9 @@ class MainActivity : AppCompatActivity() {
         val db = Database(this, User.getTable())
 
         val list = ArrayList<User>()
-        list.add(User("aaa", 0.012323))
-        list.add(User("bbb", 0.022323))
-        list.add(User("ccc", 0.032323))
+        list.add(User("aaa", "dddd"))
+        list.add(User("bbb", "eeeee"))
+        list.add(User("ccc", "fffff"))
 
 
 
