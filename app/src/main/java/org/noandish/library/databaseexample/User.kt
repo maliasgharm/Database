@@ -58,7 +58,7 @@ class User(val fname: String, val lname: String) {
         }
 
         fun hashMapToEventItem(items: HashMap<String, Any>): User {
-            return User(items[KEY_FNAME] as String,(items[KEY_LNAME] as String).toDouble())
+            return User(items[KEY_FNAME] as String,(items[KEY_LNAME] as String))
         }
 
         fun arrayRangeToArrayHash(items: ArrayList<User>): ArrayList<HashMap<String, Any>> {
